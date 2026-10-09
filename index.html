@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Topology — Meet us at the edge.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111113;
+    --fg: #f4f4f2;
+    --dim: rgba(244, 244, 242, .55);
+    --faint: rgba(244, 244, 242, .28);
+    --line: rgba(244, 244, 242, .22);
+    --sans: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+    --pad: clamp(14px, 1.6vw, 28px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: var(--sans); font-weight: 400;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: var(--mono); }
+
+  /* ---------- loader ---------- */
+  #loader {
+    position: fixed; left: 0; top: 0; height: 2px; width: 100%; z-index: 100;
+    background: var(--fg); transform-origin: 0 50%; transform: scaleX(0);
+    transition: transform .3s ease, opacity .6s ease .2s; pointer-events: none;
+  }
+  #loader.done { opacity: 0; }
+
+  /* ---------- nav ---------- */
+  .nav {
+    position: fixed; inset: 0 0 auto 0; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--pad); pointer-events: none;
+  }
+  .nav > * { pointer-events: auto; }
+  .logo {
+    font-size: clamp(18px, 1.55vw, 26px); letter-spacing: -.035em; line-height: 1;
+    display: inline-flex; white-space: nowrap; cursor: pointer;
+  }
+  .logo i {
+    font-style: normal; display: inline-block; transform-origin: 50% 60%;
+    transition: transform .09s steps(2), background-color .09s steps(2), color .09s steps(2);
+  }
+  .logo i.blk { background: currentColor; color: transparent !important; text-shadow: none; }
+  .nav ul { display: flex; gap: clamp(12px, 1.3vw, 24px); list-style: none; }
+  .nav ul a {
+    font-family: var(--mono); font-size: clamp(8px, .62vw, 11px); letter-spacing: .06em;
+    text-transform: uppercase; color: var(--dim); position: relative; padding: 4px 0;
+    transition: color .35s ease;
+  }
+  .nav ul a::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+    background: currentColor; transform: scaleX(0); transform-origin: 0 50%;
+    transition: transform .45s cubic-bezier(.2, .7, .1, 1);
+  }
+  .nav ul a:hover, .nav ul a.on { color: var(--fg); }
+  .nav ul a.on::after, .nav ul a:hover::after { transform: scaleX(1); }
+
+  /* ---------- hero (scroll-scrubbed video) ---------- */
+  .hero { position: relative; height: 620vh; z-index: 2; background: var(--bg); }
+  .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #e9e9e9; }
+  .stage video {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    will-change: transform; transform: translateZ(0);
+  }
+  .shade {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(40, 40, 42, 0) 42%, rgba(60, 60, 62, .55) 78%, rgba(48, 48, 50, .82) 100%);
+  }
+  .blackout { position: absolute; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; }
+  .intro { position: absolute; inset: 0; will-change: opacity, transform, filter; }
+  .intro h1 {
+    position: absolute; left: var(--pad); bottom: clamp(54px, 9.2vh, 96px);
+    font-weight: 400; font-size: clamp(44px, 9vw, 168px); line-height: .96; letter-spacing: -.045em;
+  }
+  .intro p {
+    position: absolute; left: 56%; bottom: clamp(62px, 11vh, 112px);
+    font-size: clamp(12px, 1.5vw, 26px); line-height: 1.08; letter-spacing: -.015em; max-width: 19em;
+  }
+  .bar.rule {
+    position: absolute; left: var(--pad); right: var(--pad); bottom: clamp(12px, 2vh, 22px);
+    display: flex; justify-content: space-between; padding-top: clamp(10px, 1.6vh, 18px);
+    font-family: var(--mono); font-size: clamp(8px, .6vw, 11px); letter-spacing: .06em; text-transform: uppercase;
+  }
+  .bar a i { font-style: normal; display: inline-block; animation: bob 1.8s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(3px); } }
+  .jump {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: clamp(26px, 4.4vw, 84px); letter-spacing: -.04em; white-space: nowrap;
+    opacity: 0; will-change: opacity, filter, transform;
+    text-shadow: 0 0 40px rgba(0, 0, 0, .12);
+  }
+
+  /* bracketed hairlines */
+  .rule { position: relative; border-top: 1px solid var(--line); }
+  .rule::before, .rule::after {
+    content: ""; position: absolute; top: -1px; width: 1px; height: 5px; background: var(--line);
+  }
+  .rule::before { left: 0; } .rule::after { right: 0; }
+  .rule.up::before, .rule.up::after { top: auto; bottom: 0; }
+
+  /* ---------- dark content ---------- */
+  main { position: relative; z-index: 2; }
+  .dark { background: var(--bg); position: relative; }
+  [data-f] { will-change: opacity, filter; }
+
+  .about { padding: 16vh var(--pad) 0; text-align: center; }
+  .about .logo { font-size: clamp(40px, 5.6vw, 104px); cursor: default; }
+  .about h3 { font-weight: 400; font-size: clamp(14px, 1.45vw, 26px); letter-spacing: -.02em; margin-top: clamp(40px, 9vh, 96px); }
+  .about p {
+    font-family: var(--mono); font-size: clamp(9px, .74vw, 13px); line-height: 1.55; letter-spacing: .01em;
+    color: var(--dim); max-width: 44em; margin: clamp(18px, 3vh, 34px) auto 0;
+  }
+
+  .item { position: relative; max-width: 30em; }
+  .item .n {
+    position: absolute; right: calc(100% + 1em); top: .35em;
+    font-family: var(--mono); font-size: clamp(7px, .5vw, 10px); color: var(--faint);
+  }
+  .item h2 { font-weight: 400; font-size: clamp(22px, 2.9vw, 54px); letter-spacing: -.04em; line-height: 1.05; }
+  .item h2 a { display: inline-flex; align-items: baseline; gap: .35em; }
+  .item h2 a em { font-style: normal; font-size: .38em; color: var(--faint); transition: transform .4s cubic-bezier(.2, .7, .1, 1), color .3s; transform: translateY(-.9em); }
+  .item h2 a:hover em { transform: translate(.3em, -1.2em); color: var(--fg); }
+  .item p {
+    font-family: var(--mono); font-size: clamp(9px, .74vw, 13px); line-height: 1.6; letter-spacing: .01em;
+    margin-top: clamp(12px, 2vh, 24px); max-width: 47ch;
+  }
+  .item p.soft { color: var(--dim); }
+  .stagger { padding: 22vh 0 0; }
+  .stagger .item { margin-left: 12%; }
+  .stagger .item:nth-child(even) { margin-left: 61%; margin-top: 16vh; }
+  .stagger .item + .item:nth-child(odd) { margin-top: 12vh; }
+
+  .principles { display: grid; grid-template-columns: 61% 1fr; padding: 28vh 0 10vh; }
+  .principles .left { position: relative; }
+  .principles .left h2 {
+    position: sticky; top: 42vh; margin-left: clamp(14px, 7vw, 140px);
+    font-weight: 300; font-size: clamp(40px, 7vw, 132px); letter-spacing: -.045em; line-height: 1;
+  }
+  .pr { max-width: 31em; padding-right: var(--pad); margin-bottom: 11vh; }
+  .pr h3 { font-weight: 400; font-size: clamp(20px, 2.9vw, 54px); letter-spacing: -.04em; line-height: 1.05; }
+  .pr p { font-size: clamp(11px, 1.02vw, 18px); line-height: 1.22; letter-spacing: -.01em; margin-top: clamp(12px, 2.2vh, 26px); max-width: 26em; }
+  .pr blockquote { font-size: clamp(9px, .78vw, 14px); line-height: 1.35; color: var(--faint); margin-top: clamp(12px, 2.2vh, 24px); max-width: 30em; }
+  .pr cite { display: block; font-style: normal; font-family: var(--mono); font-size: clamp(7px, .5vw, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: clamp(8px, 1.3vh, 14px); }
+
+  .team { padding: 20vh var(--pad) 0; text-align: center; }
+  .team > h2 { font-weight: 300; font-size: clamp(44px, 7vw, 132px); letter-spacing: -.045em; line-height: 1; }
+  .people { display: flex; justify-content: center; gap: clamp(18px, 4.2vw, 84px); margin-top: clamp(50px, 12vh, 130px); flex-wrap: wrap; }
+  .person { width: clamp(120px, 16vw, 300px); }
+  .bust {
+    width: 100%; aspect-ratio: 1 / .98; display: block; object-fit: cover; object-position: 50% 0;
+    filter: grayscale(1) brightness(1.18) contrast(1.05) url(#lift);
+    -webkit-mask-image: linear-gradient(#000 78%, transparent 99%); mask-image: linear-gradient(#000 78%, transparent 99%);
+    transition: filter .6s ease, transform .9s cubic-bezier(.2, .7, .1, 1);
+  }
+  .person:hover .bust { filter: grayscale(1) brightness(1.4) contrast(1.05) url(#lift); transform: translateY(-4px) scale(1.02); }
+  .person h4 { font-weight: 400; font-size: clamp(13px, 1.4vw, 26px); letter-spacing: -.03em; margin-top: clamp(8px, 1.6vh, 18px); }
+  .person .role { font-family: var(--mono); font-weight: 700; font-size: clamp(7px, .56vw, 10px); margin-top: .9em; }
+  .person .prev { font-family: var(--mono); font-size: clamp(7px, .56vw, 10px); line-height: 1.5; color: var(--dim); margin: .8em auto 0; max-width: 20em; }
+  .soc { display: inline-flex; gap: .7em; margin-top: 1.4em; align-items: center; }
+  .soc a { opacity: .85; transition: opacity .3s; display: block; line-height: 0; } .soc a:hover { opacity: 1; }
+  .soc svg { width: clamp(9px, .8vw, 14px); height: clamp(9px, .8vw, 14px); fill: currentColor; }
+
+  .support { width: min(60%, 1160px); margin: 16vh auto 0; }
+  .support .in { padding: clamp(18px, 3.6vh, 40px) 0 clamp(20px, 4vh, 44px); }
+  .support h3 { font-weight: 400; font-size: clamp(18px, 2vw, 38px); letter-spacing: -.035em; }
+  .support p { font-size: clamp(9px, .86vw, 16px); letter-spacing: -.01em; margin-top: clamp(18px, 3.4vh, 38px); display: flex; justify-content: center; gap: .7em; flex-wrap: wrap; }
+  .support p span + span::before { content: "·"; color: var(--faint); margin-right: .7em; }
+
+  .goods { padding: 24vh 0 0; }
+  .goods > h3 { text-align: center; font-weight: 400; font-size: clamp(16px, 1.75vw, 32px); letter-spacing: -.03em; }
+  .goods .stagger { padding-top: 8vh; }
+  .goods .stagger .item:nth-child(even) { margin-top: 9vh; }
+  .goods .stagger .item + .item:nth-child(odd) { margin-top: 9vh; }
+
+  .veil { height: 80vh; background: linear-gradient(to bottom, var(--bg) 0%, rgba(17, 17, 19, .82) 35%, rgba(17, 17, 19, .45) 70%, rgba(17, 17, 19, 0) 100%); pointer-events: none; }
+  .gap { height: 100vh; height: 100svh; pointer-events: none; }
+  .tail { position: relative; z-index: 2; }
+  .tail .dark { height: 0; }
+
+  /* ---------- footer (fixed, revealed beneath) ---------- */
+  .foot { position: fixed; inset: 0; z-index: 1; overflow: hidden; background: #dcdcdc; visibility: hidden; }
+  .foot video { position: absolute; inset: -3%; width: 106%; height: 106%; object-fit: cover; will-change: transform; }
+  .foot::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(30, 30, 32, 0) 55%, rgba(52, 52, 54, .62) 82%, rgba(44, 44, 46, .86) 100%);
+  }
+  .card { position: absolute; left: var(--pad); right: var(--pad); bottom: clamp(10px, 1.8vh, 20px); z-index: 2; }
+  .card .body { display: grid; grid-template-columns: 46.5% 1fr auto; padding: clamp(10px, 1.8vh, 20px) clamp(8px, 1vw, 18px) clamp(8px, 1.4vh, 16px); min-height: clamp(84px, 15vh, 170px); row-gap: 14px; }
+  .card .logo { font-size: clamp(18px, 1.75vw, 32px); align-self: start; }
+  .card ul { list-style: none; }
+  .card li a, .card .small {
+    font-family: var(--mono); font-size: clamp(7px, .52vw, 10px); letter-spacing: .06em; text-transform: uppercase; line-height: 1.75;
+  }
+  .card li a { opacity: .9; transition: opacity .3s; } .card li a:hover { opacity: .5; }
+  .card .small { align-self: end; text-transform: none; letter-spacing: .02em; }
+  .card .small span { color: rgba(244, 244, 242, .6); }
+  .card .top { grid-column: 3; align-self: end; text-transform: uppercase; letter-spacing: .06em; }
+  .card .soc { margin-top: 0; align-self: start; justify-self: end; }
+  .card .small.touch { grid-column: 1 / 3; }
+
+  @media (max-width: 760px) {
+    .nav ul { gap: 10px; } .nav ul li:nth-child(n+4) { display: none; }
+    .intro p { left: var(--pad); bottom: clamp(40px, 6vh, 60px); }
+    .intro h1 { bottom: 15vh; font-size: 15vw; }
+    .stagger .item, .stagger .item:nth-child(even) { margin-left: 14%; margin-right: var(--pad); }
+    .principles { grid-template-columns: 1fr; }
+    .principles .left h2 { position: static; margin: 0 0 10vh 14%; }
+    .pr { margin-left: 14%; }
+    .support { width: 88%; }
+    .card .body { grid-template-columns: 1fr 1fr auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar a i { animation: none; } }
+</style>
+</head>
+<body>
+
+<div id="loader"></div>
+
+<!-- lifts pure black in the bust renders to the page background so their frames disappear -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="lift" color-interpolation-filters="sRGB">
+    <feComponentTransfer>
+      <feFuncR type="linear" slope=".9333" intercept=".0667"/>
+      <feFuncG type="linear" slope=".9333" intercept=".0667"/>
+      <feFuncB type="linear" slope=".9255" intercept=".0745"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
+
+<header class="nav">
+  <a class="logo" href="#top" data-logo aria-label="Topology">Topology</a>
+  <ul>
+    <li><a href="#about" data-nav="about">About</a></li>
+    <li><a href="#principles" data-nav="principles">Principles</a></li>
+    <li><a href="#team" data-nav="team">Team</a></li>
+    <li><a href="#goods" data-nav="goods">Public goods</a></li>
+    <li><a href="#top">Careers</a></li>
+  </ul>
+</header>
+
+<!-- ======================= HERO ======================= -->
+<section class="hero" id="top">
+  <div class="stage">
+    <video id="heroVideo" muted playsinline preload="auto" crossorigin="anonymous"
+      src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/d06ccc0c-116f-4b73-86a4-ecfd53672266.mp4"></video>
+    <div class="shade" id="shade"></div>
+
+    <div class="intro" id="intro">
+      <h1>Meet us<br>at the edge.</h1>
+      <p>We’re an early stage emerging tech venture firm.</p>
+      <div class="bar rule">
+        <span>Topology ©2024</span>
+        <a href="#about">Explore <i>↓</i></a>
+      </div>
+    </div>
+
+    <div class="jump" id="jump1">You jump...</div>
+    <div class="jump" id="jump2">We jump...</div>
+    <div class="blackout" id="blackout"></div>
+  </div>
+</section>
+
+<!-- ======================= DARK CONTENT ======================= -->
+<main>
+  <div class="dark">
+
+    <section class="about" id="about">
+      <div class="logo" data-logo data-f>Topology</div>
+      <h3 data-f>Where our name comes from</h3>
+      <p data-f>Inspired by topological dimension reduction — a mathematical and machine learning technique that simplifies complex, high-dimensional data while preserving essential features and core qualities.</p>
+      <p data-f>We see our work as similar: distilling intricate webs of information into key insights that drive high-conviction investments and long term partnerships.</p>
+    </section>
+
+    <section class="stagger">
+      <div class="item" data-f>
+        <span class="n">01.</span>
+        <h2>What we do</h2>
+        <p>We partner with brilliant technologists who have unreasonable ambition. We dream big and are devoted to advancing the intersection of technology and humanity. We are currently focused on AI, robotics, autonomous discovery, and neurotech.</p>
+      </div>
+      <div class="item" data-f>
+        <span class="n">02.</span>
+        <h2>How we do it</h2>
+        <p>We are extremely selective in who we partner with. Straight up — we have a network we’re phenomenally proud of, are fun to work with, deeply technical, and run through walls to help our founders win.</p>
+      </div>
+    </section>
+
+    <section class="principles" id="principles">
+      <div class="left"><h2 data-f>Principles</h2></div>
+      <div class="right">
+        <article class="pr" data-f>
+          <h3>Execute with Vision</h3>
+          <p>The greatest impact emerges when wild imagination meets calculated execution.</p>
+          <blockquote>“Vision without action is a daydream. Action without vision is a nightmare.”</blockquote>
+          <cite>Japanese proverb</cite>
+        </article>
+        <article class="pr" data-f>
+          <h3>Self Author</h3>
+          <p>Have the confidence to pursue the future state you know is within reach.</p>
+          <blockquote>“The self-authoring mind can take responsibility for its own values and ideology rather than depend on others to define its reality.”</blockquote>
+          <cite>Robert Kegan</cite>
+        </article>
+        <article class="pr" data-f>
+          <h3>Lead with Curiosity</h3>
+          <p>The path to changing the world often begins with an earnestly spoken ‘why’.</p>
+          <blockquote>“I just wondered how things were put together.”</blockquote>
+          <cite>Claude Shannon</cite>
+        </article>
+      </div>
+    </section>
+
+    <section class="team" id="team">
+      <h2 data-f>Team</h2>
+      <div class="people">
+        <div class="person" data-f>
+          <img class="bust" alt="" loading="lazy" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_083427_a08be428-e25f-4361-b3ac-5e5abbbd8783.png">
+          <h4>Casey Caruso</h4>
+          <div class="role">Investing</div>
+          <div class="prev">prev. Google, Bessemer, Paradigm</div>
+          <div class="soc"><a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M20.4 2H3.6A1.6 1.6 0 0 0 2 3.6v16.8A1.6 1.6 0 0 0 3.6 22h16.8a1.6 1.6 0 0 0 1.6-1.6V3.6A1.6 1.6 0 0 0 20.4 2ZM8.1 18.9H5.2V9.6h2.9v9.3ZM6.6 8.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Zm12.3 10.6H16v-4.5c0-1.1 0-2.5-1.5-2.5s-1.8 1.200-1.8 2.400v4.600H9.900V9.600h2.800v1.300a3 3 0 0 1 2.700-1.500c2.900 0 3.500 1.900 3.500 4.400v5.100Z"/></svg></a><a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M18.200 2.300h3.300l-7.200 8.300 8.500 11.200h-6.700l-5.200-6.800-6 6.800H1.700l7.700-8.800L1.300 2.300h6.800l4.700 6.200 5.400-6.200Zm-1.200 17.500h1.800L7.100 4.200H5.100l11.900 15.600Z"/></svg></a></div>
+        </div>
+        <div class="person" data-f>
+          <img class="bust" alt="" loading="lazy" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_083427_6c12d70d-1724-4565-a623-5a5ad5e2423f.png">
+          <h4>Hunter Harloff</h4>
+          <div class="role">Research</div>
+          <div class="prev">prev. Citadel</div>
+          <div class="soc"><a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M20.4 2H3.6A1.6 1.6 0 0 0 2 3.6v16.8A1.6 1.6 0 0 0 3.6 22h16.8a1.6 1.6 0 0 0 1.6-1.6V3.6A1.6 1.6 0 0 0 20.4 2ZM8.1 18.9H5.2V9.6h2.9v9.3ZM6.6 8.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Zm12.3 10.6H16v-4.5c0-1.1 0-2.5-1.5-2.5s-1.8 1.200-1.8 2.400v4.600H9.900V9.600h2.800v1.300a3 3 0 0 1 2.700-1.500c2.900 0 3.500 1.900 3.500 4.400v5.100Z"/></svg></a><a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M18.200 2.300h3.300l-7.200 8.300 8.500 11.200h-6.700l-5.200-6.800-6 6.800H1.700l7.700-8.800L1.300 2.300h6.800l4.700 6.200 5.400-6.200Zm-1.200 17.500h1.800L7.100 4.200H5.100l11.900 15.600Z"/></svg></a></div>
+        </div>
+        <div class="person" data-f>
+          <img class="bust" alt="" loading="lazy" src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_083427_c89f1ab4-3382-46f6-89ab-bf7653c5775f.png">
+          <h4>Austin Echtenkamp</h4>
+          <div class="role">Operations &amp; Finance</div>
+          <div class="prev">prev. Coinbase</div>
+          <div class="soc"><a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M20.4 2H3.6A1.6 1.6 0 0 0 2 3.6v16.8A1.6 1.6 0 0 0 3.6 22h16.8a1.6 1.6 0 0 0 1.6-1.6V3.6A1.6 1.6 0 0 0 20.4 2ZM8.1 18.9H5.2V9.6h2.9v9.3ZM6.6 8.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Zm12.3 10.6H16v-4.5c0-1.1 0-2.5-1.5-2.5s-1.8 1.200-1.8 2.400v4.600H9.900V9.600h2.800v1.300a3 3 0 0 1 2.700-1.500c2.900 0 3.500 1.900 3.500 4.400v5.100Z"/></svg></a><a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M18.200 2.300h3.300l-7.200 8.300 8.500 11.200h-6.700l-5.200-6.800-6 6.800H1.700l7.700-8.800L1.300 2.300h6.800l4.700 6.200 5.400-6.200Zm-1.200 17.500h1.800L7.100 4.200H5.100l11.900 15.600Z"/></svg></a></div>
+        </div>
+      </div>
+
+      <div class="support" data-f>
+        <div class="rule"></div>
+        <div class="in">
+          <h3>Supported by</h3>
+          <p><span>Marc Andreessen</span><span>Cofounder of OpenAI</span><span>Founding Member of Anthropic</span></p>
+        </div>
+        <div class="rule up"></div>
+      </div>
+    </section>
+
+    <section class="goods" id="goods">
+      <h3 data-f>Public goods</h3>
+      <div class="stagger">
+        <div class="item" data-f>
+          <span class="n">01.</span>
+          <h2><a href="#">Neuro Map <em>↗</em></a></h2>
+          <p class="soft">An interactive atlas of the neurotechnology landscape, mapping companies and modalities across brain-computer interfaces.</p>
+        </div>
+        <div class="item" data-f>
+          <span class="n">02.</span>
+          <h2><a href="#">Scientific AI Map <em>↗</em></a></h2>
+          <p class="soft">A market map of the scientific AI landscape, tracking companies and tools applying machine learning to accelerate scientific research and discovery.</p>
+        </div>
+        <div class="item" data-f>
+          <span class="n">03.</span>
+          <h2><a href="#">Robotics Map <em>↗</em></a></h2>
+          <p class="soft">An interactive map of the robotics ecosystem, charting companies building autonomous systems, hardware platforms, and embodied intelligence.</p>
+        </div>
+        <div class="item" data-f>
+          <span class="n">04.</span>
+          <h2><a href="#">LatentZip <em>↗</em></a></h2>
+          <p class="soft">An open-source compression algorithm that leverages latent space representations to achieve high-ratio compression for natural language.</p>
+        </div>
+      </div>
+      <div style="height:14vh"></div>
+    </section>
+  </div>
+
+  <div class="veil" id="veil"></div>
+  <div class="gap" id="gap"></div>
+</main>
+
+<!-- ======================= FOOTER ======================= -->
+<footer class="foot" id="foot">
+  <video id="footVideo" muted playsinline loop preload="metadata"
+    poster="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261008_083425_b2d0aecd-04ec-435d-946d-8c5ac14bfd17.png" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/9c237156-30ab-482f-a1a1-55da99ae7008.mp4"></video>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="body">
+      <a class="logo" href="#top" data-logo>Topology</a>
+      <ul>
+        <li><a href="#about">About</a></li>
+        <li><a href="#principles">Principles</a></li>
+        <li><a href="#team">Team</a></li>
+        <li><a href="#">Terms &amp; Conditions</a></li>
+        <li><a href="#">Privacy Policy</a></li>
+      </ul>
+      <div class="soc">
+        <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24"><path d="M12 7.300a4.700 4.700 0 1 0 0 9.400 4.700 4.700 0 0 0 0-9.400Zm0 7.700a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm6-7.900a1.100 1.100 0 1 1-2.200 0 1.100 1.100 0 0 1 2.200 0ZM21.900 8.200c-.1-1.500-.400-2.800-1.500-3.900s-2.400-1.400-3.900-1.500c-1.500-.1-6.100-.1-7.600 0-1.500.1-2.800.4-3.900 1.500S3.600 6.700 3.500 8.200c-.1 1.500-.1 6.100 0 7.600.1 1.500.4 2.800 1.500 3.900s2.400 1.400 3.900 1.500c1.500.1 6.100.1 7.600 0 1.500-.1 2.800-.4 3.900-1.500s1.400-2.400 1.500-3.900c.1-1.500.1-6.100 0-7.600Zm-2 9.300a3.100 3.100 0 0 1-1.700 1.700c-1.200.5-4.100.4-5.400.4s-4.200.1-5.400-.4a3.100 3.100 0 0 1-1.700-1.700c-.5-1.200-.4-4.100-.4-5.400s-.1-4.200.4-5.400a3.100 3.100 0 0 1 1.700-1.700c1.200-.5 4.100-.4 5.400-.4s4.200-.1 5.400.4a3.100 3.100 0 0 1 1.700 1.700c.5 1.200.4 4.100.4 5.400s.1 4.200-.4 5.400Z"/></svg></a>
+        <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M20.4 2H3.6A1.6 1.6 0 0 0 2 3.6v16.8A1.6 1.6 0 0 0 3.6 22h16.8a1.6 1.6 0 0 0 1.6-1.6V3.6A1.6 1.6 0 0 0 20.4 2ZM8.1 18.9H5.2V9.6h2.9v9.3ZM6.6 8.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Zm12.3 10.6H16v-4.5c0-1.1 0-2.5-1.5-2.5s-1.8 1.200-1.8 2.400v4.600H9.900V9.600h2.800v1.300a3 3 0 0 1 2.700-1.500c2.900 0 3.500 1.900 3.500 4.400v5.100Z"/></svg></a>
+        <a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M18.200 2.300h3.300l-7.200 8.300 8.500 11.200h-6.700l-5.200-6.800-6 6.800H1.700l7.700-8.800L1.300 2.300h6.800l4.700 6.200 5.400-6.200Zm-1.200 17.500h1.800L7.100 4.200H5.100l11.900 15.600Z"/></svg></a>
+      </div>
+      <div class="small touch"><span>Get in touch:</span> <a href="mailto:info@topology.vc">info@topology.vc</a></div>
+      <a class="small top" href="#top">Back to top ↑</a>
+    </div>
+    <div class="rule up"></div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const span = (v, a, b) => clamp((v - a) / (b - a));           // 0→1 between a and b
+  const smooth = t => t * t * (3 - 2 * t);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- smooth scroll ---------- */
+  let lenis = null;
+  if (window.Lenis && !reduce) {
+    lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 0.9, smoothWheel: true });
+  }
+  $$('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
+    const id = a.getAttribute('href');
+    if (id.length < 2) { e.preventDefault(); return; }
+    const el = $(id); if (!el) return;
+    e.preventDefault();
+    const y = id === '#top' ? 0 : el.getBoundingClientRect().top + scrollY - innerHeight * 0.12;
+    lenis ? lenis.scrollTo(y, { duration: 1.6 }) : scrollTo({ top: y, behavior: 'smooth' });
+  }));
+
+  /* ---------- glitching wordmark ---------- */
+  const logos = $$('[data-logo]').map(el => {
+    el.innerHTML = [...el.textContent].map(c => `<i>${c}</i>`).join('');
+    return { el, letters: $$('i', el), busy: false };
+  });
+  function glitch(logo, ms = 520) {
+    if (logo.busy || reduce) return;
+    logo.busy = true;
+    const t0 = performance.now();
+    const tick = () => {
+      const done = performance.now() - t0 > ms;
+      logo.letters.forEach(l => {
+        if (done) { l.style.transform = ''; l.classList.remove('blk'); l.style.opacity = ''; return; }
+        const r = Math.random();
+        if (r < .45) {
+          l.classList.toggle('blk', Math.random() < .55);
+          l.style.transform = `scale(${(.3 + Math.random() * 2).toFixed(2)}, ${(.25 + Math.random() * .6).toFixed(2)}) translateX(${((Math.random() - .5) * 6).toFixed(1)}px)`;
+          l.style.opacity = '1';
+        } else if (r < .65) {
+          l.style.opacity = '0';
+        } else { l.style.transform = ''; l.classList.remove('blk'); l.style.opacity = ''; }
+      });
+      if (done) { logo.busy = false; return; }
+      setTimeout(tick, 75);
+    };
+    tick();
+  }
+  setInterval(() => glitch(logos[0], 380 + Math.random() * 300), 3400);
+  logos.forEach(l => l.el.addEventListener('mouseenter', () => glitch(l)));
+
+  /* ---------- hero video scrub ---------- */
+  const video = $('#heroVideo'), hero = $('.hero');
+  const intro = $('#intro'), shade = $('#shade'), blackout = $('#blackout');
+  const j1 = $('#jump1'), j2 = $('#jump2'), loader = $('#loader');
+  let dur = 0, cur = 0, target = 0, ready = false;
+
+  const onMeta = () => { dur = video.duration || 0; ready = dur > 0; };
+  video.addEventListener('loadedmetadata', onMeta);
+  if (video.readyState >= 1) onMeta();
+  video.pause();
+
+  // Pull the whole clip into memory so every seek is instant.
+  (async () => {
+    try {
+      const res = await fetch(video.currentSrc || video.src, { mode: 'cors' });
+      const total = +res.headers.get('content-length') || 0;
+      const reader = res.body.getReader(); const chunks = []; let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        chunks.push(value); got += value.length;
+        if (total) loader.style.transform = `scaleX(${got / total})`;
+      }
+      const url = URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
+      const keep = cur;
+      video.src = url; video.load();
+      video.addEventListener('loadedmetadata', () => { onMeta(); video.currentTime = keep; }, { once: true });
+    } catch (e) { /* streaming straight from the CDN still works */ }
+    loader.style.transform = 'scaleX(1)'; loader.classList.add('done');
+  })();
+
+  /* ---------- scroll-linked reveals ---------- */
+  const faders = $$('[data-f]');
+  const navLinks = $$('[data-nav]');
+  const sections = navLinks.map(a => $('#' + a.dataset.nav));
+  const foot = $('#foot'), footVideo = $('#footVideo'), gap = $('#gap'), veil = $('#veil');
+  const aboutLogo = logos[1];
+  let aboutSeen = false, lastY = -1, vel = 0;
+
+  function setText(el, a, y = 0, blur = 0) {
+    el.style.opacity = a.toFixed(3);
+    el.style.filter = blur > .05 ? `blur(${blur.toFixed(2)}px)` : 'none';
+    if (y !== null) el.style.transform = el.classList.contains('jump')
+      ? `translate(-50%, calc(-50% + ${y.toFixed(1)}px))` : `translateY(${y.toFixed(1)}px)`;
+  }
+
+  function layout() {
+    const y = scrollY, vh = innerHeight;
+    vel = Math.abs(y - lastY); lastY = y;
+
+    // hero progress
+    const p = clamp(y / (hero.offsetHeight - vh)) || 0;
+    target = p;
+
+    const out = smooth(span(p, .015, .13));
+    setText(intro, 1 - out, -out * 40, out * 10);
+    shade.style.opacity = (1 - smooth(span(p, .02, .2))).toFixed(3);
+
+    const a1 = smooth(span(p, T.j1[0], T.j1[1])) * (1 - smooth(span(p, T.j1[2], T.j1[3])));
+    const a2 = smooth(span(p, T.j2[0], T.j2[1])) * (1 - smooth(span(p, T.j2[2], T.j2[3])));
+    setText(j1, a1, (1 - span(p, T.j1[0], T.j1[1])) * 18 - span(p, T.j1[2], T.j1[3]) * 18, (1 - a1) * 8);
+    setText(j2, a2, (1 - span(p, T.j2[0], T.j2[1])) * 18, (1 - a2) * 8);
+    blackout.style.opacity = smooth(span(p, .93, .985)).toFixed(3);
+
+    // dark-section elements brighten as they rise and dim as they leave
+    for (const el of faders) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < -80 || r.top > vh + 80) continue;
+      const mid = r.top + Math.min(r.height, vh * .3) * .5;
+      const a = smooth(span(mid, vh * 1.0, vh * .72)) * (1 - smooth(span(r.bottom, vh * .14, vh * .0)) * .9);
+      el.style.opacity = a.toFixed(3);
+      el.style.filter = a < .98 ? `blur(${((1 - a) * 6).toFixed(2)}px)` : 'none';
+    }
+
+    // wordmark assembles out of glitch blocks once the hole has swallowed the frame
+    const ar = aboutLogo.el.getBoundingClientRect();
+    if (!aboutSeen && ar.top < vh * .86) { aboutSeen = true; glitch(aboutLogo, 900); }
+    if (aboutSeen && ar.top > vh * 1.1) aboutSeen = false;
+    if (vel > 55) glitch(logos[0], 260);
+
+    // nav state
+    let on = -1;
+    sections.forEach((s, i) => { if (s && s.getBoundingClientRect().top < vh * .5) on = i; });
+    if (gap.getBoundingClientRect().top < vh * .6) on = -1;
+    navLinks.forEach((a, i) => a.classList.toggle('on', i === on));
+
+    // footer lives underneath; only wake it when the veil is on screen
+    const show = veil.getBoundingClientRect().top < vh;
+    if (show !== footOn) {
+      footOn = show; foot.style.visibility = show ? 'visible' : 'hidden';
+      show ? footVideo.play().catch(() => {}) : footVideo.pause();
+    }
+    if (show) {
+      const fp = span(gap.getBoundingClientRect().top, vh, 0);
+      footVideo.style.transform = `scale(${(1.08 - fp * .08).toFixed(4)})`;
+    }
+  }
+  let footOn = false;
+
+  // hero overlay timings, as fractions of the hero scroll
+  const T = { j1: [.30, .36, .50, .55], j2: [.56, .62, .76, .83] };
+
+  /* ---------- frame loop ---------- */
+  let dirty = true;
+  addEventListener('scroll', () => { dirty = true; }, { passive: true });
+  addEventListener('resize', () => { dirty = true; });
+
+  function frame(t) {
+    if (lenis) lenis.raf(t);
+    if (dirty) { dirty = false; layout(); }
+    if (ready) {
+      // ease the playhead toward the scroll position; never stack seeks
+      cur += (target - cur) * (reduce ? 1 : .14);
+      if (Math.abs(target - cur) < .0004) cur = target;
+      const want = clamp(cur * (dur - .05), 0, dur - .05);
+      if (!video.seeking && Math.abs(video.currentTime - want) > .008) video.currentTime = want;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
